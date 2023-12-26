@@ -1,0 +1,6 @@
+pytest
+pytest-cov
+moto
+boto3
+pytest-mock
+requests-mock
