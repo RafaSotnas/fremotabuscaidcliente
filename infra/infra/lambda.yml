@@ -1,0 +1,197 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Launch a lambda using a pipeline app..
+
+Parameters:
+  SplunkFunctionArn:
+    Type: String
+    Description: ARN da Lambda que receberá o trigger e leverá os logs para o Splunk
+  LambdaName:
+    Description: Nome da funcao. Verifique o arquivo de parametros
+    Type: String
+  FunctionHandler:
+    Description: Handler de invocacao da lambda.
+    Default: lambda_function.lambda_handler
+    Type: String
+  FunctionVPCSecurityGroup:
+    Description: Security group anexado na funcao para execucao dentro da VPC. Verifique o arquivo de parametros
+    Type: String
+  FunctionVPCSubnetId1:
+    Description: ID da subnet 1 para execucao dentro da VPC. Verifique o arquivo de parametros
+    Type: String
+  FunctionVPCSubnetId2:
+    Description: ID da subnet 2 para execucao dentro da VPC. Verifique o arquivo de parametros
+    Type: String
+  FunctionTeamContactEmail:
+    Description: TAG necessaria. Informar o endereco de e-mail do responsavel pela conta. Ira receber notificacoes de complaince. Verifique o arquivo de parametros
+    Type: String
+  #### Não alterar, parâmetros abaixo preenchidos pela pipeline de aplicação em lambda.
+  CodeUriBucket:
+    Description: Bucket onde o codigo da aplicacao estara alocado. Valor informado automaticamente pela pipeline de Lambda.
+    Type: String
+  CodeUriKey:
+    Description: Nome do artefato. Valor informado automaticamente pela pipeline de Lambda.
+    Type: String
+  ################
+  FeatureName:
+    Description: Nome da feature. Verifique o arquivo de parametros teste
+    Type: String
+  MicroServiceName:
+    Description: Nome do micro servico. Verifique o arquivo de parametros
+    Type: String
+
+  #### Váriáveis de ambiente para serem usadas ma lambda
+  UrlTokenBase:
+    Description: "Url base do token"
+    Type: String
+  UrlTokenEndPoint:
+    Description: "End point do token"
+    Type: String
+
+  UrlBaseEQ3:
+    Description: "Url base do EQ3"
+    Type: String
+  UrlEndPointEQ3:
+    Description: "End point do EQ3"
+    Type: String
+
+  ItauApiKey:
+    Description: "Código x-itau-apikey"
+    Type: String
+  ItauFlowID:
+    Description: "Código x-itau-flowID"
+    Type: String
+  ApigwApiId:
+    Description: "Código x-apigw-api-id"
+    Type: String
+
+  #Busca via parameter
+  FunctionKMSArn:
+    Description: ARN do KMS
+    Type: "AWS::SSM::Parameter::Value<String>"
+    Default: "/Itau/Parameters/KMS/ARN/FremotaKMS"
+
+  # Busca o arn da role via parameter - Utilizando uma role especifica criada para o projeto
+  LambdaFunctionRole:
+    Description: arn do IAM da Role que sera usada para deploy da lambda
+    Type: "AWS::SSM::Parameter::Value<String>"
+    Default: "/Shared/Role/fremota-lambda-role"
+
+  FunctionRuntime:
+    Description: Runtime que ira ser utilizado na lambda
+    Type: String
+    Default: "python3.7"
+    AllowedValues:
+      - "python3.8" ### Incluido pelo Rafael Oliveira
+      - "python3.7"
+      - "nodejs12.x"
+      - "dotnetcore3.1"
+      - "java8"
+      - "java11"
+  LambdaLayerVersion:
+     Type: Number
+
+Resources:
+
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Ref LambdaName
+      Handler: !Ref FunctionHandler
+      Role: !Ref LambdaFunctionRole
+      Code:
+        S3Bucket: !Ref CodeUriBucket
+        S3Key: !Ref CodeUriKey
+      Runtime: !Ref FunctionRuntime
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref FunctionVPCSecurityGroup
+        SubnetIds:
+          - !Ref FunctionVPCSubnetId1
+          - !Ref FunctionVPCSubnetId2
+      KmsKeyArn: !Ref FunctionKMSArn
+      Layers:
+         - !Sub "arn:aws:lambda:sa-east-1:984688426935:layer:cloudsec-itau-ca-bundle-lambda-layer:${LambdaLayerVersion}"
+      Tags:
+        - Key: tech-team-email
+          Value: !Ref FunctionTeamContactEmail
+      Environment:
+        Variables:
+          UrlTokenBase: !Ref UrlTokenBase
+          UrlTokenEndPoint: !Ref UrlTokenEndPoint
+          UrlBaseEQ3: !Ref UrlBaseEQ3
+          UrlEndPointEQ3: !Ref UrlEndPointEQ3
+          ItauApiKey: !Ref ItauApiKey
+          ItauFlowID: !Ref ItauFlowID
+          ApigwApiId: !Ref ApigwApiId
+          STSClientIdSecretArn: "{{resolve:secretsmanager:/ME6/Fremota/EQ3/Credentials:SecretString:client_id}}"
+          STSSecretArn: "{{resolve:secretsmanager:/ME6/Fremota/EQ3/Credentials:SecretString:client_secret}}"
+          ClientId: "{{resolve:secretsmanager:/ME6/FremotaBuscaIdCliente/Credentials:SecretString:client_id}}"
+          ClientSecret: "{{resolve:secretsmanager:/ME6/FremotaBuscaIdCliente/Credentials:SecretString:client_secret}}"
+          SSL_CERT_FILE: /opt/certs/ca_bundle.crt
+
+  ## Logando no Splunk
+  LambdaSplunkSubscription:
+    Type: AWS::Logs::SubscriptionFilter
+    DependsOn: LambdaPermission
+    Properties:
+      DestinationArn: !Ref SplunkFunctionArn
+      LogGroupName: !Sub "/aws/lambda/${LambdaName}"
+      FilterPattern: ""
+
+  LambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !Ref SplunkFunctionArn
+      Principal: !Join
+        - "."
+        - ["logs", !Ref "AWS::Region", !Ref "AWS::URLSuffix"]
+      SourceAccount: !Ref "AWS::AccountId"
+      SourceArn: !Join
+        - ":"
+        - [
+            "arn",
+            !Ref "AWS::Partition",
+            "logs",
+            !Ref "AWS::Region",
+            !Ref "AWS::AccountId",
+            "log-group",
+            !Sub "/aws/lambda/${LambdaName}",
+            "*",
+          ]
+
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaName}"
+      RetentionInDays: 3
+
+  404MetricFilter:
+    Type: AWS::Logs::MetricFilter
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${LambdaName}"
+      FilterPattern: "[ip, identity, user_id, timestamp, request, status_code = 404, size, ...]"
+      MetricTransformations:
+        - MetricValue: "1"
+          MetricNamespace: !Sub "${FeatureName}-${MicroServiceName}/404s"
+          MetricName: !Sub "${FeatureName}-${MicroServiceName}/404Count"
+    DependsOn: CloudWatchLogGroup
+
+  404Alarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "Alarm-${FeatureName}-${MicroServiceName}-404s"
+      AlarmDescription: "Alarm description"
+      MetricName: !Sub "${FeatureName}-${MicroServiceName}/404Count"
+      Namespace: !Sub "${FeatureName}-${MicroServiceName}/404s"
+      Statistic: Sum
+      Period: "60"
+      EvaluationPeriods: "1"
+      Threshold: "1"
+      AlarmActions:
+        - "{{resolve:ssm:/org/member/workload_local_sns_arn:1}}"
+      OKActions:
+        - "{{resolve:ssm:/org/member/workload_local_sns_arn:1}}"
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+    DependsOn: 404MetricFilter

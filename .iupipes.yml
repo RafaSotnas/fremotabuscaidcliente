@@ -1,0 +1,58 @@
+project:
+  language: 'python'
+build:
+  architecture: 'x64'
+  python-version: '3.8'
+  requirement-path: 'requirements.txt'
+  working-directory: 'app'
+test:
+  requirement-path: 'requirements.txt'
+  working-directory: 'app'
+publish:
+  copy-all-dependency: true
+  deploy-only: '.'
+  install-dependency-path: '.'
+infra:
+  cloudformation:
+    aws-owner-contact-email: 'EMAIL@itau-unibanco.com.br'
+    aws-region: 'sa-east-1'
+    aws-tech-team-email: 'EMAIL@itau-unibanco.com.br'
+    destroy-dev: 'false'
+    destroy-hom: 'false'
+    destroy-prod: 'false'
+    template-file-path: 'lambda.yml'
+    working-directory: 'infra'
+deploy:
+  aws:
+    dev:
+      account: '779726708338'
+      lambda:
+        alias: 'dev'
+        application: 'FremotaBuscaIdCliente'
+        strategy: 'CodeDeployDefault.LambdaAllAtOnce'
+    hom:
+      account: '745880205166'
+      lambda:
+        alias: 'hom'
+        application: 'FremotaBuscaIdCliente'
+        strategy: 'CodeDeployDefault.LambdaAllAtOnce'
+    prod:
+      account: '359926588861'
+      lambda:
+        alias: 'prod'
+        application: 'FremotaBuscaIdCliente'
+        strategy: 'CodeDeployDefault.LambdaAllAtOnce'
+quality:
+  sonar:
+    gate-name: ''
+    language: 'python'
+    parameters: ''
+    projectPropertiesPath: ''
+    working-directory: 'app'
+security:
+  fortify:
+    environment-analyse: 'public_cloud'
+    sigla-app: 'ME6-F1001'
+    sigla: 'ME6' 
+    nome-aws: 'FremotaBuscaIdCliente'
+    produto-aws: 'plataformabackofficeativos'

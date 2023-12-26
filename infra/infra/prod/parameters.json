@@ -1,0 +1,18 @@
+{
+    "Parameters": {
+        "LambdaName": "FremotaBuscaIdCliente",
+        "FunctionVPCSubnetId1": "subnet-0ac86fe4cb1efc309",
+        "FunctionVPCSubnetId2": "subnet-0ab0d8c6a19f4b006",
+        "FunctionVPCSecurityGroup": "sg-047ec4b6d0d3017b8",
+        "FunctionTeamContactEmail": "Squad2020MoedaNacionalInovAtivos@correio.itau.com.br",
+        "UrlTokenBase": "sts.mbi.cloud.ihf",
+        "UrlTokenEndPoint": "/api/oauth/token",
+        "UrlBaseEQ3": "api-sp.prod.aws.cloud.ihf",
+        "UrlEndPointEQ3": "/prod/pessoas/v1/originacao_clientes",
+        "ItauApiKey": "eaa4c7e6-62d7-4e89-975b-3eaa5db1182b",
+        "ItauFlowID": "1234",
+        "ApigwApiId": "wl76sins6i",
+        "LambdaLayerVersion": 18,
+        "SplunkFunctionArn": "arn:aws:lambda:sa-east-1:359926588861:function:plataformabackofficeativos-infrafremotasplunk"
+    }    
+}
